@@ -70,10 +70,9 @@ def load_okti(filename):#从 OKTI 文件中加载图像
             dg = int(stream[i + 2], 16) - 8
             db = int(stream[i + 3], 16) - 8
             i += 4
-            new_pixel = (prev[0] + dr, prev[1] + dg, prev[2] + db)
-            new_pixel = (max(0, min(255, new_pixel[0])),
-                         max(0, min(255, new_pixel[1])),
-                         max(0, min(255, new_pixel[2])))
+            new_pixel = ((prev[0] + dr) % 256,
+                         (prev[1] + dg) % 256,
+                         (prev[2] + db) % 256)
 
         elif t == 'r':
             count = int(stream[i + 1], 16)
@@ -105,11 +104,15 @@ def load_okti(filename):#从 OKTI 文件中加载图像
 
         pixels.append(new_pixel)
         prev = new_pixel
-        if new_pixel in color_list:
-            color_list.remove(new_pixel)
-        color_list.insert(0, new_pixel)
-        if len(color_list) > 256:
-            color_list.pop()
+
+        # 【核心修复】只有在生成全新像素（p, d）或重复像素（r, R）时，才更新列表
+        # 如果当前类型是 'i' 或 'I'，说明颜色已经存在于列表中，直接跳过，绝对不能修改列表！
+        if t not in ('i', 'I'):
+            if new_pixel in color_list:
+                color_list.remove(new_pixel)
+            color_list.insert(0, new_pixel)
+            if len(color_list) > 256:
+                color_list.pop()
 
     # 画图部分：
     scale = 10
@@ -125,10 +128,12 @@ def load_okti(filename):#从 OKTI 文件中加载图像
             canvas.create_rectangle(x * scale, y * scale, (x + 1) * scale, (y + 1) * scale, fill=color, outline=color)
 
     # 新建并保存图片
+    # 终极安全检查：强行将所有像素限制在合法的 RGB 范围内
+    safe_pixels = [(max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b))) for (r, g, b) in pixels]
     save_img = Image.new("RGB", (width, height))
-    save_img.putdata(pixels)
-    save_img.save(r"D:/files/pycharm_file/labtasks/task2output1.2/" + filename + ".png")
-    print("图片已成功保存为：D:/files/pycharm_file/labtasks/task2output1.2/" + filename + ".png")
+    save_img.putdata(safe_pixels)  # 用安全的像素列表去保存
+    save_img.save(r"D:/files\pycharm_file/labtasks/taskoutput1.2/" + filename + ".png")
+    print("图片已成功保存为：D:/files/pycharm_file/labtasks/taskoutput1.2/" + filename + ".png")
 
     root.mainloop()
 
