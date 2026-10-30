@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>今天吃什么 - What To Eat</title>
+    <style>
+        :root {
+            --bg-dark: #111111;
+            --text-light: #ffffff;
+            --primary: #ff7b00;
+            --color-meal: rgba(122, 221, 243, 0.6);
+            --color-diet: rgba(250, 215, 76, 0.6);
+            --color-avoid: rgba(250, 99, 146, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 900px;
+            height: 600px;
+            position: relative;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            transition: background-color 0.8s ease;
+            background-color: #333;
+        }
+
+        .page {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            transform: translateY(20px); z-index: 1;
+        }
+
+        .page.active {
+            opacity: 1; pointer-events: auto; transform: translateY(0); z-index: 10;
+        }
+
+        .bg-watermark {
+            position: absolute;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.2);
+            white-space: normal;
+            text-align: center;
+            line-height: 0.9;
+            z-index: 0;
+            pointer-events: none;
+            text-transform: uppercase;
+            font-family: Arial, sans-serif;
+        }
+        #result-watermark {
+            color: rgba(225,225,225,0.5);
+        }
+
+        #result-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 20px 30px rgba(0,0,0,0.4));
+            transition: transform 0.4s;
+            z-index: 1;
+        }
+
+        #page1 > :not(.bg-watermark),
+        #page4 > :not(.bg-watermark) {
+            position: relative;
+            z-index: 1;
+        }
+
+        #page1::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('foodimages/1.jpg');
+            background-size: cover;
+            background-position: center;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        #page4::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('foodimages/2.jpg');
+            background-size: cover;
+            background-position: center;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .btn-glow {
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            overflow: hidden;
+            transition: transform 0.2s, background 0.3s;
+            backdrop-filter: blur(5px);
+            margin: 8px;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .btn-glow:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.05); }
+        .btn-glow:active { transform: scale(0.95); }
+
+        .btn-orange {
+            background: var(--primary) !important;
+            border: none !important;
+            font-weight: 600;
+            font-size: 18px;
+            padding: 12px 24px;
+        }
+        .btn-orange:hover { background: #ff8c1a !important; }
+
+        .btn-glow::before {
+            content: ''; position: absolute; top: var(--y); left: var(--x);
+            transform: translate(-50%, -50%); width: 150px; height: 150px;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+            opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: -1;
+        }
+        .btn-glow:hover::before { opacity: 0.4; }
+
+        .options-group {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            max-width: 700px; margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 18px; color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 15px; letter-spacing: 2px;
+        }
+
+        #page1 h1 { font-size: 48px; margin-bottom: 40px; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        #page2 h1 { font-size: 48px; margin-bottom: 40px; text-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+        .taste-row-1 { width: 100%; max-width: 500px; display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; }
+        .taste-row-2 { width: 100%; max-width: 400px; display: flex; justify-content: space-between; gap: 10px; }
+
+        .taste-row-1 .btn-glow, .taste-row-2 .btn-glow { flex: 1; margin: 0; text-align: center; }
+
+        .food-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .food-card.fade-out {
+            opacity: 0;
+            transform: scale(0.95) translateY(10px);
+        }
+
+        .food-image-container {
+            position: relative;
+            width: 450px;
+            height: 320px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2;
+        }
+
+        .food-image {
+            width: 100%; height: 100%; object-fit: contain;
+            filter: drop-shadow(0 20px 30px rgba(0,0,0,0.4));
+        }
+
+        .food-tag {
+            position: absolute;
+            background: rgba(60, 50, 20, 0.85);
+            color: #ffffff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            z-index: 3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            /* 初始隐藏，JS控制显现 */
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: scale(0.9);
+        }
+
+        .food-tag.tag-visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .pos-0 { top: 10%; left: 0%; }
+        .pos-1 { top: 15%; right: 0%; }
+        .pos-2 { top: 45%; left: -5%; }
+        .pos-3 { top: 50%; right: -5%; }
+        .pos-4 { bottom: 10%; left: 5%; }
+        .pos-5 { bottom: 5%; right: 5%; }
+
+        .food-name {
+            font-size: 32px;
+            font-weight: bold;
+            margin-top: 20px;
+            letter-spacing: 2px;
+            /* 初始隐藏 */
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .food-name.name-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .food-desc {
+            font-size: 16px;
+            color: rgba(255,255,255,0.8);
+            margin-top: 10px;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.5;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 1.2s ease;
+        }
+        .food-desc.desc-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .action-btns { display: flex; gap: 20px; margin-top: 40px; z-index: 10; }
+
+        .btn-primary { background: white; color: #333; border: none; font-weight: bold; }
+        .btn-primary:hover { background: #f0f0f0; }
+
+        #btn-random {
+            background: white !important;
+            color: #333 !important;
+            border: none !important;
+            font-weight: bold;
+        }
+        #btn-random:hover {
+            background: #f0f0f0 !important;
+        }
+
+        #page4 h1 { font-size: 40px; margin-bottom: 20px; color: #fff; text-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        #page4 .success-emoji { font-size: 120px; margin-bottom: 20px; animation: bounce 1s infinite alternate; }
+        @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-20px); } }
+
+        #custom-alert {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 9999;
+        }
+        #custom-alert.show { opacity: 1; pointer-events: auto; }
+        .alert-box {
+            background: #2a2a2a; border: 1px solid rgba(255,255,255,0.2);
+            padding: 30px 40px; border-radius: 20px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        #custom-alert.show .alert-box { transform: scale(1); }
+        .alert-msg { font-size: 18px; margin-bottom: 20px; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <div class="page active" id="page1">
+           <div class="bg-watermark" style="top: 8%; left: 13%; font-size: 14vw;">WHAT</div>
+            <div class="bg-watermark" style="top: 37%; left: 50%; transform: translateX(-50%); font-size: 14vw;">TO</div>
+            <div class="bg-watermark" style="top: 67%; left: 20%; font-size: 14vw;">EAT?</div>
+
+            <h1>今天想吃点什么？</h1>
+
+            <div class="section-title">请选择餐段：</div>
+            <div class="options-group" id="meal-options">
+                <button class="btn-glow" id="btn-random" style="border-color: rgba(255,255,255,0.5);">随便吃点</button>
+            </div>
+
+            <div class="section-title">您的饮食偏好是？</div>
+            <div class="options-group" id="diet-options">
+                <button class="btn-glow" data-diet="素食">🥬 素食</button>
+                <button class="btn-glow" data-diet="荤食">🍖 荤食</button>
+                <button class="btn-glow" data-diet="荤素都可">🍽️ 荤素都可</button>
+                <button class="btn-glow" data-diet="无肉不欢">🔥 无肉不欢</button>
+            </div>
+
+            <div class="section-title">有什么忌口吗？</div>
+            <div class="options-group" id="avoid-options">
+                <button class="btn-glow" data-avoid="不吃香菜">🚫 不吃香菜</button>
+                <button class="btn-glow" data-avoid="不吃葱">🚫 不吃葱</button>
+                <button class="btn-glow" data-avoid="不吃辣">🚫 不吃辣</button>
+                <button class="btn-glow" data-avoid="海鲜过敏">🚫 海鲜过敏</button>
+            </div>
+
+            <button class="btn-glow btn-orange" id="btn-next" style="margin-top: 30px; width: 200px;">下一步：选口味</button>
+        </div>
+
+        <div class="page" id="page2">
+            <div class="bg-watermark" style="top: 20%; left: 50%; transform: translate(-50%, -50%); font-size: 11vw;">WHAT'S</div>
+            <div class="bg-watermark" style="top: 49%; left: 50%; transform: translate(-50%, -50%); font-size: 11vw;">YOUR</div>
+            <div class="bg-watermark" style="top: 79%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw;">TASTE</div>
+
+            <h1>偏好什么口味？</h1>
+
+            <div class="taste-row-1">
+                <button class="btn-glow taste-btn" data-taste="清淡" style="--hover-color: rgba(34, 197, 94, 0.6);">🥗 清淡</button>
+                <button class="btn-glow taste-btn" data-taste="爽辣" style="--hover-color: rgba(220, 38, 38, 0.6);">🌶️ 爽辣</button>
+                <button class="btn-glow taste-btn" data-taste="酸甜" style="--hover-color: rgba(249, 115, 22, 0.6);">🍋 酸甜</button>
+            </div>
+
+            <div class="taste-row-2">
+                <button class="btn-glow btn-orange" id="btn-back-1">上一步</button>
+                <button class="btn-glow taste-btn" data-taste="都可以" style="--hover-color: rgba(234, 179, 8, 0.6);">都可以</button>
+            </div>
+        </div>
+
+        <div class="page" id="page3">
+            <div class="bg-watermark" id="result-watermark">FOOD</div>
+
+            <div class="food-card" id="food-card">
+                <div class="food-image-container" id="image-container">
+                    <img src="" alt="食物" id="result-img">
+                </div>
+
+                <div class="food-name" id="result-name">食物名称</div>
+                <div class="food-desc" id="result-desc">食物描述</div>
+
+                <div class="action-btns">
+                    <button class="btn-glow" id="btn-change-taste">重选口味</button>
+                    <button class="btn-glow btn-primary" id="btn-accept">就这个</button>
+                    <button class="btn-glow" id="btn-change">换一个 🔄</button>
+                    <button class="btn-glow" id="btn-restart">重新制定</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="page" id="page4">
+            <div class="bg-watermark" style="top: 64%; left: 50%; transform: translate(-50%, -50%); font-size: 11vw;">HUNGRY!</div>
+            <img src="foodimages/gp.png" alt="庆祝" class="success-emoji" style="width: 150px; height: 150px; object-fit: contain; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.4));">
+            <h1>今天就吃这个啦！</h1>
+            <div class="food-name" id="final-food-name" style="font-size: 36px; margin-top: 10px; margin-bottom: 40px; color: #fff;">食物名称</div>
+
+            <button class="btn-glow btn-orange" id="btn-final-restart" style="width: 200px;">再选一次</button>
+        </div>
+    </div>
+
+    <div id="custom-alert">
+        <div class="alert-box">
+            <div class="alert-msg" id="alert-text">提示信息</div>
+            <button class="btn-glow btn-orange" id="btn-alert-close">知道啦</button>
+        </div>
+    </div>
+
+    <script>
+        const foodsDB = [
+            {
+                name: "皮蛋瘦肉粥", english: "Congee",
+                meal: "早餐", diet: "荤食", taste: "清淡",
+                desc: "暖胃又满足，清晨的最佳唤醒。",
+                img: "foodimages/zhou.png",
+                tags: ["中式", "粥类", "瘦肉", "皮蛋", "熬煮"],
+                bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+            },
+            {
+                name: "牛油果沙拉", english: "Salad",
+                meal: ["早餐", "正餐"], diet: "素食", taste: "清淡",
+                desc: "新鲜蔬菜配上特调油醋汁，健康轻盈。",
+                img: "foodimages/nyg.png",
+                tags: ["轻食", "健康", "牛油果", "蔬菜", "凉拌"],
+                bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            {
+                name: "麻辣香锅", english: "Spicy Pot",
+                meal: ["正餐"], diet: "荤食", taste: "爽辣",
+                desc: "越吃越上头，配米饭绝佳。",
+                img: "foodimages/mlxg.png",
+                tags: ["川菜", "下饭", "辣椒", "肉片", "爆炒", "火热"],
+                bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            {
+                name: "番茄鸡蛋面", english: "Noodles",
+                meal: ["正餐"], diet: "素食", taste: "酸甜",
+                desc: "经典家常味，酸甜开胃，汤汁浓郁。",
+                img: "foodimages/fqjdm.png",
+                tags: ["面食", "家常", "番茄", "鸡蛋", "水煮"] ,
+                bgStyle: "top: 50%; left: 45%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+            },
+            {
+                name: "芝士披萨", english: "Pizza",
+                meal: ["正餐"], diet: "荤素都可", taste: "都可以",
+                desc: "拉丝芝士，烤得焦脆的边缘，满满的碳水快乐。",
+                img: "foodimages/pizza.png",
+                tags: ["西餐", "快餐", "芝士", "面饼", "烤制"]
+            },
+            { name: "炸鸡汉堡", english: "Burger", meal: ["正餐"], diet: "荤食", taste: "爽辣", desc: "金黄酥脆，多汁鸡肉，每一口都是满足。",
+              img: "foodimages/burger.png",
+              tags: ["西式", "高热量", "鸡肉", "面包", "油炸"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+             },
+            { name: "抹茶拿铁", english: "Latte", meal: "茶歇", diet: "素食", taste: "清淡", desc: "微苦回甘，搭配精致下午茶点心。",
+              img: "foodimages/coffee.png",
+              tags: ["饮品", "下午茶", "抹茶", "牛奶", "冲泡"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "草莓慕斯", english: "Mousse", meal: "茶歇", diet: "素食", taste: "酸甜", desc: "入口即化，酸甜的草莓与奶油的完美交融。",
+              img: "foodimages/mousse.png",
+              tags: ["甜点", "下午茶", "草莓", "奶油", "烘焙"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+            },
+            { name: "关东煮", english: "Oden", meal: "小吃", diet: "荤素都可", taste: "清淡", desc: "高汤熬煮，萝卜吸满汤汁，冬日暖手好物。",
+              img: "foodimages/gdz.png",
+              tags: ["日式", "夜宵", "萝卜", "鱼丸", "炖煮"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "烤冷面", english: " Cold Noodles", meal: "小吃", diet: "荤食", taste: "酸甜", desc: "刷上酸甜酱汁，加上洋葱和烤肠，路边摊的灵魂。",
+              img: "foodimages/klm.png",
+              tags: ["街头", "小吃", "冷面", "烤肠", "铁板煎"],
+              bgStyle: "top: 50%; left: 48%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+            },
+            { name: "扬州炒饭", english: "Fried Rice", meal: ["正餐"], diet: "荤素都可", taste: "清淡", desc: "颗粒分明，配料丰富，经典中式主食。",
+              img: "foodimages/yzcf.png",
+              tags: ["中式", "主食", "米饭", "火腿", "翻炒"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "螺蛳粉", english: "Luosifen", meal: ["正餐", "小吃"], diet: "荤食", taste: "爽辣", desc: "闻着臭吃着香，酸笋和辣油的碰撞。",
+              img: "foodimages/lsf.png",
+              tags: ["广西", "米粉", "米粉", "酸笋", "熬煮"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8vw; width: 80%;"
+            },
+            { name: "热干面", english: "  Hot Noodles", meal: "早餐", diet: "素食", taste: "爽辣", desc: "芝麻酱香浓郁，配上萝卜丁，武汉人的过早。",
+              img: "foodimages/rgm.png",
+              tags: ["湖北", "面食", "碱面", "芝麻酱", "水煮"],
+              bgStyle: "top: 50%; left: 45%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;text-align:center;"
+            },
+            { name: "糖醋里脊", english: "Sweet Pork", meal: ["正餐"], diet: "荤食", taste: "酸甜", desc: "外酥里嫩，酸甜可口，小孩最爱。",
+              img: "foodimages/tclj.png",
+              tags: ["鲁菜", "炒菜", "里脊肉", "糖醋汁", "油炸"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "玉米沙拉", english: "Corn Salad", meal: "茶歇", diet: "素食", taste: "清淡", desc: "清甜玉米粒，低脂健康小零食。",
+              img: "foodimages/ym.png",
+              tags: ["轻食", "玉米", "沙拉酱", "凉拌"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "香辣鸡翅", english: "Wings", meal: "小吃", diet: "荤食", taste: "爽辣", desc: "外皮微焦，内里爆汁，配冰可乐一绝。",
+              img: "foodimages/xljc.png",
+              tags: ["油炸", "夜宵", "鸡翅", "香辛料", "烘烤"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            },
+            { name: "榴莲酥", english: "Pastry", meal: "茶歇", diet: "素食", taste: "都可以", desc: "浓郁榴莲果肉，起酥外皮，爱的人极爱。",
+              img: "foodimages/lls.png",
+              tags: ["甜点", "广式", "榴莲", "面粉", "烘焙"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10vw; width: 80%;"
+            },
+            { name: "煎饼果子", english: "Jianbing", meal: "早餐", diet: "荤食", taste: "爽辣", desc: "绿豆面糊摊薄，加脆饼和鸡蛋，刷上面酱。",
+              img: "foodimages/jbgz.png",
+              tags: ["天津", "早餐", "面糊", "鸡蛋", "摊煎"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8vw; width: 80%;"
+            },
+            { name: "提拉米苏", english: "Tiramisu", meal: "茶歇", diet: "素食", taste: "酸甜", desc: "咖啡与朗姆酒的交织，细腻的马斯卡彭奶酪。",
+              img: "foodimages/tlms.png",
+              tags: ["甜点", "意式", "咖啡", "奶酪", "冷藏"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 8vw; width: 80%;"
+            },
+            { name: "牛肉拉面", english: "Beef Ramen", meal: ["正餐"], diet: "荤食", taste: "清淡", desc: "一清二白三红四绿，大片牛肉，汤头浓郁。",
+              img: "foodimages/beeflm.png",
+              tags: ["兰州", "面食", "牛肉", "拉面", "熬汤"],
+              bgStyle: "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;"
+            }
+        ];
+
+        const themeColors = { "清淡": "#22c55e", "爽辣": "#dc2626", "酸甜": "#f97316", "都可以": "#eab308" };
+
+        let userSelection = { meal: [], diet: "", avoid: [], taste: "" };
+        let currentCandidates = [];
+        let currentFoodIndex = 0;
+        let revealTimeouts = [];
+
+        const page1 = document.getElementById('page1');
+        const page2 = document.getElementById('page2');
+        const page3 = document.getElementById('page3');
+        const page4 = document.getElementById('page4');
+        const app = document.getElementById('app');
+        const card = document.getElementById('food-card');
+        const watermark = document.getElementById('result-watermark');
+        const imageContainer = document.getElementById('image-container');
+        const resultNameEl = document.getElementById('result-name');
+        const resultDescEl = document.getElementById('result-desc');
+
+        const customAlert = document.getElementById('custom-alert');
+        const alertText = document.getElementById('alert-text');
+        function showAlert(msg) {
+            alertText.innerText = msg;
+            customAlert.classList.add('show');
+        }
+        document.getElementById('btn-alert-close').addEventListener('click', () => {
+            customAlert.classList.remove('show');
+        });
+
+        const meals = ["早餐", "正餐", "茶歇", "小吃"];
+        const mealContainer = document.getElementById('meal-options');
+        userSelection.meal.push("正餐");
+        meals.forEach(meal => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-glow';
+            btn.innerText = meal;
+            btn.dataset.meal = meal;
+            if (meal === "正餐") btn.style.background = 'var(--color-meal)';
+            mealContainer.insertBefore(btn, document.getElementById('btn-random'));
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            document.querySelectorAll('.btn-glow').forEach(btn => {
+                const rect = btn.getBoundingClientRect();
+                btn.style.setProperty('--x', `${e.clientX - rect.left}px`);
+                btn.style.setProperty('--y', `${e.clientY - rect.top}px`);
+            });
+        });
+
+        mealContainer.addEventListener('click', (e) => {
+            if(e.target.classList.contains('btn-glow')) {
+                const val = e.target.dataset.meal;
+                if(userSelection.meal.includes(val)) {
+                    userSelection.meal = userSelection.meal.filter(item => item !== val);
+                    e.target.style.background = 'rgba(255,255,255,0.1)';
+                } else {
+                    userSelection.meal.push(val);
+                    e.target.style.background = 'var(--color-meal)';
+                }
+            }
+        });
+
+        const dietContainer = document.getElementById('diet-options');
+        dietContainer.addEventListener('click', (e) => {
+            if(e.target.classList.contains('btn-glow')) {
+                const val = e.target.dataset.diet;
+                if(userSelection.diet === val) {
+                    userSelection.diet = "";
+                    e.target.style.background = 'rgba(255,255,255,0.1)';
+                } else {
+                    Array.from(dietContainer.children).forEach(c => c.style.background = 'rgba(255,255,255,0.1)');
+                    userSelection.diet = val;
+                    e.target.style.background = 'var(--color-diet)';
+                }
+            }
+        });
+
+        const avoidContainer = document.getElementById('avoid-options');
+        avoidContainer.addEventListener('click', (e) => {
+            if(e.target.classList.contains('btn-glow')) {
+                const val = e.target.dataset.avoid;
+                if(userSelection.avoid.includes(val)) {
+                    userSelection.avoid = userSelection.avoid.filter(item => item !== val);
+                    e.target.style.background = 'rgba(255,255,255,0.1)';
+                } else {
+                    userSelection.avoid.push(val);
+                    e.target.style.background = 'var(--color-avoid)';
+                }
+            }
+        });
+
+        page2.addEventListener('click', (e) => {
+            if(e.target.classList.contains('taste-btn')) {
+                document.querySelectorAll('.taste-btn').forEach(btn => btn.style.background = 'rgba(255,255,255,0.1)');
+                e.target.style.background = e.target.style.getPropertyValue('--hover-color') || 'rgba(255,255,255,0.4)';
+                userSelection.taste = e.target.dataset.taste;
+                setTimeout(() => { startRecommendation(); }, 300);
+            }
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if(userSelection.meal.length === 0) return showAlert("请至少选择一个餐段哦~");
+            switchPage(page2);
+        });
+        document.getElementById('btn-back-1').addEventListener('click', () => switchPage(page1));
+
+        function switchPage(targetPage) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            targetPage.classList.add('active');
+        }
+
+        function clearAllRevealTimeouts() {
+            revealTimeouts.forEach(t => clearTimeout(t));
+            revealTimeouts = [];
+        }
+
+        function revealWithSequence(food) {
+            clearAllRevealTimeouts();
+
+            resultNameEl.classList.remove('name-visible');
+            resultDescEl.classList.remove('desc-visible');
+            imageContainer.querySelectorAll('.food-tag').forEach(tag => {
+                tag.classList.remove('tag-visible');
+            });
+
+            revealTimeouts.push(setTimeout(() => {
+                const imgEl = document.getElementById('result-img');
+                imgEl.style.transform = 'scale(1.1) rotate(3deg)';
+                setTimeout(() => { imgEl.style.transform = 'scale(1) rotate(0deg)'; }, 200);
+            }, 50));
+
+            revealTimeouts.push(setTimeout(() => {
+                resultNameEl.classList.add('name-visible');
+            }, 250));
+
+            const tags = imageContainer.querySelectorAll('.food-tag');
+            tags.forEach((tag, idx) => {
+                revealTimeouts.push(setTimeout(() => {
+                    tag.classList.add('tag-visible');
+                }, 550 + idx * 80));
+            });
+
+            revealTimeouts.push(setTimeout(() => {
+                resultDescEl.classList.add('desc-visible');
+            }, 1000));
+        }
+
+        function startRecommendation() {
+            currentCandidates = foodsDB.filter(food => {
+                const matchMeal = userSelection.meal.length === 0 || (Array.isArray(food.meal) ? food.meal.some(m => userSelection.meal.includes(m)) : userSelection.meal.includes(food.meal));
+                const matchTaste = userSelection.taste === "都可以" || food.taste === userSelection.taste;
+                const matchDiet = userSelection.diet === "" || userSelection.diet === "荤素都可" || food.diet === userSelection.diet || food.diet === "荤素都可";
+                let matchAvoid = true;
+                if (userSelection.avoid.includes("不吃辣") && food.taste === "爽辣") matchAvoid = false;
+                return matchMeal && matchTaste && matchDiet && matchAvoid;
+            });
+
+            if (currentCandidates.length === 0) {
+                currentCandidates = foodsDB.filter(f => f.taste === userSelection.taste);
+                if(currentCandidates.length === 0) currentCandidates = foodsDB;
+            }
+
+            currentCandidates.sort(() => Math.random() - 0.5);
+            currentFoodIndex = 0;
+            app.style.backgroundColor = themeColors[userSelection.taste] || themeColors["都可以"];
+
+            updateCardContent(false);
+
+            card.style.opacity = 1;
+            switchPage(page3);
+
+            revealWithSequence();
+        }
+
+        function updateCardContent(skipReveal = false) {
+            const food = currentCandidates[currentFoodIndex];
+
+            watermark.innerText = food.english;
+            watermark.style.cssText = food.bgStyle || "top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12vw; width: 80%;";
+
+            document.getElementById('result-img').src = food.img;
+            resultNameEl.innerText = food.name;
+            resultDescEl.innerText = food.desc;
+
+            imageContainer.querySelectorAll('.food-tag').forEach(el => el.remove());
+
+            const posClasses = ['pos-0', 'pos-1', 'pos-2', 'pos-3', 'pos-4', 'pos-5'];
+            const tagsToRender = food.tags ? food.tags.slice(0, 6) : [];
+
+            tagsToRender.forEach((tagText, index) => {
+                const tagEl = document.createElement('div');
+                tagEl.className = `food-tag ${posClasses[index]}`;
+                tagEl.innerText = tagText;
+                imageContainer.appendChild(tagEl);
+            });
+
+            if (skipReveal) {
+                resultNameEl.classList.add('name-visible');
+                resultDescEl.classList.add('desc-visible');
+                imageContainer.querySelectorAll('.food-tag').forEach(tag => tag.classList.add('tag-visible'));
+            } else {
+                resultNameEl.classList.remove('name-visible');
+                resultDescEl.classList.remove('desc-visible');
+                imageContainer.querySelectorAll('.food-tag').forEach(tag => tag.classList.remove('tag-visible'));
+            }
+
+            const imgEl = document.getElementById('result-img');
+            imgEl.style.transform = 'scale(0.8) rotate(-5deg)';
+            setTimeout(() => { imgEl.style.transform = 'scale(1) rotate(0deg)'; }, 50);
+        }
+
+        document.getElementById('btn-change').addEventListener('click', () => {
+            card.classList.add('fade-out');
+            setTimeout(() => {
+                currentFoodIndex++;
+                if(currentFoodIndex >= currentCandidates.length) {
+                    currentFoodIndex = 0;
+                    currentCandidates.sort(() => Math.random() - 0.5);
+                }
+                updateCardContent(false);
+                card.classList.remove('fade-out');
+                revealWithSequence();
+            }, 300);
+        });
+
+        document.getElementById('btn-change-taste').addEventListener('click', () => {
+            app.style.backgroundColor = '#333';
+            switchPage(page2);
+            clearAllRevealTimeouts();
+        });
+
+        document.getElementById('btn-accept').addEventListener('click', () => {
+            const food = currentCandidates[currentFoodIndex];
+            document.getElementById('final-food-name').innerText = food.name;
+            switchPage(page4);
+            clearAllRevealTimeouts();
+        });
+
+        function restartAll() {
+            userSelection = { meal: ["正餐"], diet: "", avoid: [], taste: "" };
+            document.querySelectorAll('.options-group, .taste-row-1, .taste-row-2').forEach(group => {
+                Array.from(group.children).forEach(c => { c.style.background = 'rgba(255,255,255,0.1)'; });
+            });
+            const mealBtns = document.querySelectorAll('#meal-options .btn-glow');
+            mealBtns.forEach(btn => {
+                if(btn.dataset.meal === "正餐") btn.style.background = 'var(--color-meal)';
+            });
+            document.getElementById('btn-random').style.background = 'white';
+            app.style.backgroundColor = '#333';
+            switchPage(page1);
+            clearAllRevealTimeouts();
+        }
+        document.getElementById('btn-restart').addEventListener('click', restartAll);
+        document.getElementById('btn-final-restart').addEventListener('click', restartAll);
+
+        document.getElementById('btn-random').addEventListener('click', () => {
+            userSelection = { meal: [], diet: "", avoid: [], taste: "都可以" };
+
+            document.querySelectorAll('.options-group, .taste-row-1, .taste-row-2').forEach(group => {
+                Array.from(group.children).forEach(c => {
+                    if(c.id !== 'btn-random') c.style.background = 'rgba(255,255,255,0.1)';
+                });
+            });
+
+            const randomBtn = document.getElementById('btn-random');
+            randomBtn.style.background = '#ccc';
+
+            setTimeout(() => {
+                currentCandidates = [...foodsDB].sort(() => Math.random() - 0.5);
+                currentFoodIndex = 0;
+
+                let firstFood = currentCandidates[currentFoodIndex];
+
+                if (window.lastRandomTaste === firstFood.taste) {
+                    const differentTasteIndex = currentCandidates.findIndex(f => f.taste !== window.lastRandomTaste);
+                    if (differentTasteIndex !== -1) {
+                        const temp = currentCandidates[0];
+                        currentCandidates[0] = currentCandidates[differentTasteIndex];
+                        currentCandidates[differentTasteIndex] = temp;
+                        firstFood = currentCandidates[0];
+                    }
+                }
+
+                window.lastRandomTaste = firstFood.taste;
+
+                const autoColor = themeColors[firstFood.taste] || themeColors["都可以"];
+                app.style.backgroundColor = autoColor;
+                userSelection.taste = firstFood.taste;
+
+                updateCardContent(false);
+                card.className = 'food-card';
+                switchPage(page3);
+                revealWithSequence();
+            }, 300);
+        });
+
+        window.addEventListener('load', () => {
+            resultNameEl.classList.remove('name-visible');
+            resultDescEl.classList.remove('desc-visible');
+        });
+    </script>
+</body>
+</html>
